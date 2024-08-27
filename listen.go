@@ -14,28 +14,38 @@ func main() {
 }
 
 func ReadStdin() {
+	multiline := false
 	for {
 		scanner := bufio.NewScanner(os.Stdin)
-		fmt.Print(">> ")
+		if multiline {
+			fmt.Print("...")
+		} else {
+			fmt.Print(">> ")
+		}
 		eof := scanner.Scan()
 		text := scanner.Text()
 		fmt.Println(text)
 		fmt.Println(eof)
+
+		multiline = IsMulti(text)
+
 	}
 }
 
-func SyntaxCheck(text string) (bool, error) {
+func IsMulti(text string) bool {
 
 	para := strings.Count(text, "(") == strings.Count(text, ")")
+	para = para && strings.Index(text, "(") < strings.Index(text, ")")
 	curly := strings.Count(text, "{") == strings.Count(text, "}")
+	curly = curly && strings.Index(text, "{") < strings.Index(text, "}")
 
-	// invalid
+	// invalid multi line
 	square := strings.Count(text, "[") == strings.Count(text, "]")
 	if square {
-		return false, bufio.ErrBadReadCount
+		return false
 	}
 
-	return !(para && curly), nil
+	return !(para && curly)
 
 }
 
@@ -47,6 +57,10 @@ func AppendToFile(text string) error {
 	}
 
 	defer fi.Close()
+
+	if _, err := fi.WriteString(text); err != nil {
+		panic(err)
+	}
 
 	// is valid expression + shell returned error
 	return bufio.ErrFinalToken
