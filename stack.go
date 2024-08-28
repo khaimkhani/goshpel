@@ -1,4 +1,4 @@
-package goshpel
+package main
 
 import (
 	"sync"

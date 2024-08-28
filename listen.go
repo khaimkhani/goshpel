@@ -1,21 +1,28 @@
-package goshpel
+package main
 
 import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
-	"strings"
 )
 
 // var SHELLPATH string = "/var/lib/goshpel/shell.go"
 
-var SHELLPATH string = "./shell.go"
+var SHELLPATH string = "./dev/shell.go"
 
-var ALLOWEDPARA []string = []string{"(", ")", "{", "}"}
+var RESTORE string = "./dev/shell-old.txt"
+
+// TODO:
+// Need a versioning system so breaking inputs do not crash the system.
+// StdoutPipe errors should trigger a reroll (after piping error to terminal)
+// Theres a smart and dumb way to do this
 
 func ReadStdin() {
 	multiline := false
+	textbuf := []string{}
+	var err error
 	scanner := bufio.NewScanner(os.Stdin)
 	stack := NewStack()
 
@@ -28,28 +35,28 @@ func ReadStdin() {
 		scanner.Scan()
 
 		text := scanner.Text()
-		fmt.Println(text)
 
-		// need a stack here making sure all paranthesis are closed
-		multiline, err := ParaClosed(stack, text)
+		multiline, err = CheckMultiline(stack, text)
 		if err != nil {
-			// should revert here
+			if !multiline {
+				// revert
+				CopyFile(RESTORE, SHELLPATH)
+			}
+			textbuf = nil
 			break
 		}
 
+		textbuf = append(textbuf, text)
 		if !multiline {
 			// determine type (import, package, inside main())
+			stype, err := GetStatementType(textbuf)
 			// exec code
-
+			textbuf = nil
 		}
-		// if still ml then continue,
-		// else Append to file and run
-		// This retains last state effectively
-
 	}
 }
 
-func ParaClosed(s *stack, line string) (bool, error) {
+func CheckMultiline(s *stack, line string) (bool, error) {
 
 	for _, i := range line {
 		switch i {
@@ -57,7 +64,7 @@ func ParaClosed(s *stack, line string) (bool, error) {
 			s.Push('}')
 		case '(':
 			s.Push(')')
-		default:
+		case ')', '}':
 			char, err := s.Pop()
 			if err != nil {
 				return false, err
@@ -66,22 +73,32 @@ func ParaClosed(s *stack, line string) (bool, error) {
 				return false, errors.New("Paranthesis not closed")
 			}
 		}
-
 	}
 
-	return true, nil
+	return len(s.s) > 0, nil
 }
 
-func IsMulti(text string) bool {
+func GetStatementType(text []string) (string, error) {
+	return "yur", nil
+}
 
-	// valid multilines
-	para := strings.Count(text, "(") != strings.Count(text, ")")
-	para = para || strings.Index(text, "(") > strings.Index(text, ")")
-	curly := strings.Count(text, "{") != strings.Count(text, "}")
-	curly = curly || strings.Index(text, "{") > strings.Index(text, "}")
+func CopyFile(src string, dest string) error {
+	srcf, err := os.OpenFile(src, os.O_CREATE|os.O_RDONLY, 0644)
+	defer srcf.Close()
 
-	return para || curly
+	if err != nil {
+		return err
+	}
 
+	destf, err := os.OpenFile(dest, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0755)
+	defer destf.Close()
+
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(destf, srcf)
+
+	return err
 }
 
 func AppendToFile(text string) error {
@@ -109,5 +126,8 @@ func ExecShell() error {
 }
 
 func main() {
-	ReadStdin()
+	// TEMP
+	err := CopyFile(RESTORE, SHELLPATH)
+	fmt.Println(err)
+	//ReadStdin()
 }
