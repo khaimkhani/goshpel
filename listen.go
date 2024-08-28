@@ -2,6 +2,7 @@ package goshpel
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -30,12 +31,45 @@ func ReadStdin() {
 		fmt.Println(text)
 
 		// need a stack here making sure all paranthesis are closed
-		multiline = IsMulti(text)
+		multiline, err := ParaClosed(stack, text)
+		if err != nil {
+			// should revert here
+			break
+		}
+
+		if !multiline {
+			// determine type (import, package, inside main())
+			// exec code
+
+		}
 		// if still ml then continue,
 		// else Append to file and run
 		// This retains last state effectively
 
 	}
+}
+
+func ParaClosed(s *stack, line string) (bool, error) {
+
+	for _, i := range line {
+		switch i {
+		case '{':
+			s.Push('}')
+		case '(':
+			s.Push(')')
+		default:
+			char, err := s.Pop()
+			if err != nil {
+				return false, err
+			}
+			if char, ok := char.(rune); ok && char != i {
+				return false, errors.New("Paranthesis not closed")
+			}
+		}
+
+	}
+
+	return true, nil
 }
 
 func IsMulti(text string) bool {
