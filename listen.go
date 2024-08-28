@@ -1,4 +1,4 @@
-package main
+package goshpel
 
 import (
 	"bufio"
@@ -7,45 +7,46 @@ import (
 	"strings"
 )
 
-var SHELLPATH string = "/var/lib/goshpel/shell.go"
+// var SHELLPATH string = "/var/lib/goshpel/shell.go"
 
-func main() {
-	ReadStdin()
-}
+var SHELLPATH string = "./shell.go"
+
+var ALLOWEDPARA []string = []string{"(", ")", "{", "}"}
 
 func ReadStdin() {
 	multiline := false
+	scanner := bufio.NewScanner(os.Stdin)
+	stack := NewStack()
+
 	for {
-		scanner := bufio.NewScanner(os.Stdin)
 		if multiline {
-			fmt.Print("...")
+			fmt.Print("... ")
 		} else {
 			fmt.Print(">> ")
 		}
-		eof := scanner.Scan()
+		scanner.Scan()
+
 		text := scanner.Text()
 		fmt.Println(text)
-		fmt.Println(eof)
 
+		// need a stack here making sure all paranthesis are closed
 		multiline = IsMulti(text)
+		// if still ml then continue,
+		// else Append to file and run
+		// This retains last state effectively
 
 	}
 }
 
 func IsMulti(text string) bool {
 
-	para := strings.Count(text, "(") == strings.Count(text, ")")
-	para = para && strings.Index(text, "(") < strings.Index(text, ")")
-	curly := strings.Count(text, "{") == strings.Count(text, "}")
-	curly = curly && strings.Index(text, "{") < strings.Index(text, "}")
+	// valid multilines
+	para := strings.Count(text, "(") != strings.Count(text, ")")
+	para = para || strings.Index(text, "(") > strings.Index(text, ")")
+	curly := strings.Count(text, "{") != strings.Count(text, "}")
+	curly = curly || strings.Index(text, "{") > strings.Index(text, "}")
 
-	// invalid multi line
-	square := strings.Count(text, "[") == strings.Count(text, "]")
-	if square {
-		return false
-	}
-
-	return !(para && curly)
+	return para || curly
 
 }
 
@@ -58,10 +59,21 @@ func AppendToFile(text string) error {
 
 	defer fi.Close()
 
+	// Need checks here for what goes inside main {} and what is outside
 	if _, err := fi.WriteString(text); err != nil {
 		panic(err)
 	}
 
 	// is valid expression + shell returned error
 	return bufio.ErrFinalToken
+}
+
+func ExecShell() error {
+	// Exec shell.go and pass any errors to Stdout
+	// Also need a way to revert to last state
+	return nil
+}
+
+func main() {
+	ReadStdin()
 }
