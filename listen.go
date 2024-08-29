@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"strings"
 )
 
 // var SHELLPATH string = "/var/lib/goshpel/shell.go"
@@ -15,9 +17,7 @@ var SHELLPATH string = "./dev/shell.go"
 var RESTORE string = "./dev/shell-old.txt"
 
 // TODO:
-// Need a versioning system so breaking inputs do not crash the system.
 // StdoutPipe errors should trigger a reroll (after piping error to terminal)
-// Theres a smart and dumb way to do this
 
 func ReadStdin() {
 	multiline := false
@@ -50,8 +50,10 @@ func ReadStdin() {
 		if !multiline {
 			// determine type (import, package, inside main())
 			stype, err := GetStatementType(textbuf)
+			fmt.Println(stype, err)
 			// exec code
 			textbuf = nil
+
 		}
 	}
 }
@@ -78,8 +80,23 @@ func CheckMultiline(s *stack, line string) (bool, error) {
 	return len(s.s) > 0, nil
 }
 
-func GetStatementType(text []string) (string, error) {
-	return "yur", nil
+func GetStatementType(txt []string) (string, error) {
+
+	text := strings.Join(txt, " ")
+
+	stype := "MAIN"
+
+	if imprt := strings.HasPrefix(text, "import "); imprt {
+		stype = "IMPORT"
+	} else if funcdef := strings.HasPrefix(text, "func "); funcdef {
+		stype = "FUNC_DEF"
+	}
+
+	return stype, nil
+}
+
+func Inject(expr string) {
+
 }
 
 func CopyFile(src string, dest string) error {
@@ -120,14 +137,21 @@ func AppendToFile(text string) error {
 }
 
 func ExecShell() error {
-	// Exec shell.go and pass any errors to Stdout
-	// Also need a way to revert to last state
+
+	// needs external package support
+	cmd := exec.Command("go", "run", SHELLPATH)
+
+	output, err := cmd.CombinedOutput()
+
+	fmt.Println(string(output))
+	fmt.Println(err)
+
 	return nil
+
 }
 
 func main() {
 	// TEMP
-	err := CopyFile(RESTORE, SHELLPATH)
-	fmt.Println(err)
+	ExecShell()
 	//ReadStdin()
 }
