@@ -16,10 +16,16 @@ var SHELLPATH string = "./dev/shell.go"
 
 var RESTORE string = "./dev/shell-old.txt"
 
+const IMPORTBREAK string = "//IB"
+const MAINBREAK string = "//MB"
+const FUNCDEFBREAK string = "//FDB"
+
 // TODO:
+// Clean up/refactor
 // StdoutPipe errors should trigger a reroll (after piping error to terminal)
 
 func ReadStdin() {
+	t := NewTracker()
 	multiline := false
 	textbuf := []string{}
 	var err error
@@ -49,9 +55,15 @@ func ReadStdin() {
 		textbuf = append(textbuf, text)
 		if !multiline {
 			// determine type (import, package, inside main())
-			stype, err := GetStatementType(textbuf)
+			stype, err := GetStatementType(textbuf, t)
 			fmt.Println(stype, err)
+			if err != nil {
+				break
+			}
 			// exec code
+			Inject(textbuf, stype)
+
+			// reset buffer
 			textbuf = nil
 
 		}
@@ -80,7 +92,7 @@ func CheckMultiline(s *stack, line string) (bool, error) {
 	return len(s.s) > 0, nil
 }
 
-func GetStatementType(txt []string) (string, error) {
+func GetStatementType(txt []string, t *Tracker) (string, error) {
 
 	text := strings.Join(txt, " ")
 
@@ -90,12 +102,41 @@ func GetStatementType(txt []string) (string, error) {
 		stype = "IMPORT"
 	} else if funcdef := strings.HasPrefix(text, "func "); funcdef {
 		stype = "FUNC_DEF"
+	} else if constdef := strings.HasPrefix(text, "const "); constdef {
+		stype = "FUNC_DEF"
+	} else if vardef := strings.HasPrefix(text, "var "); vardef {
+		stype = "FUNC_DEF"
+	}
+
+	if stype == "MAIN" {
+		// check if var declaration/reassignment
+		// check if tracker has var
+		// do appropriate things
+		// regex match for "=" and ":="
 	}
 
 	return stype, nil
 }
 
-func Inject(expr string) {
+func Inject(text []string, stype string) {
+
+	expr := strings.Join(text, " ")
+
+	fmt.Println(expr)
+
+	switch stype {
+	case "MAIN":
+		// inject at bottom of main func
+
+	case "FUNC_DEF":
+		// before funcdefbreak
+
+	case "IMPORT":
+		// before importbreak
+
+	case "REPLACE":
+		// replace existing var
+	}
 
 }
 
@@ -151,7 +192,8 @@ func ExecShell() error {
 }
 
 func main() {
+	// TODO run init
 	// TEMP
 	ExecShell()
-	//ReadStdin()
+	// ReadStdin()
 }
