@@ -194,6 +194,6 @@ func ExecShell() error {
 func main() {
 	// TODO run init
 	// TEMP
-	ExecShell()
-	// ReadStdin()
+	// ExecShell()
+	ReadStdin()
 }
