@@ -29,7 +29,7 @@ const FUNCDEFBREAK string = "//FDB"
 
 func ReadStdin() {
 	// Read file to strings optionally
-	content := fmt.Sprintf("%s\n %s\n func main() {\n%s\n }", IMPORTBREAK, FUNCDEFBREAK, MAINBREAK)
+	content := fmt.Sprintf("package main\n%s\n %s\n func main() {\n%s\n }", IMPORTBREAK, FUNCDEFBREAK, MAINBREAK)
 	t := NewTracker()
 	multiline := false
 	textbuf := []string{}
@@ -64,9 +64,16 @@ func ReadStdin() {
 			if err != nil {
 				break
 			}
-			fmt.Println(content)
-			// exec code
+
 			Inject(textbuf, stype, &content)
+			AppendToFile(content)
+
+			// dont exec import statements
+			// wait till func def
+			if err = ExecShell(); err != nil {
+				// log this
+				return
+			}
 
 			// reset buffer
 			textbuf = nil
@@ -185,7 +192,7 @@ func CopyFile(src string, dest string) error {
 
 func AppendToFile(text string) error {
 
-	fi, err := os.Open(SHELLPATH)
+	fi, err := os.OpenFile(SHELLPATH, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0755)
 	if err != nil {
 		return err
 	}
