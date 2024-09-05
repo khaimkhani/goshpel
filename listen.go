@@ -34,6 +34,7 @@ func ReadStdin() {
 	multiline := false
 	textbuf := []string{}
 	var err error
+	var rollback string
 	scanner := bufio.NewScanner(os.Stdin)
 	stack := NewStack()
 
@@ -65,14 +66,16 @@ func ReadStdin() {
 				break
 			}
 
+			fmt.Println(content)
+			rollback = strings.Clone(content)
 			Inject(textbuf, stype, &content)
 			AppendToFile(content)
 
 			// dont exec import statements
 			// wait till func def
-			if err = ExecShell(); err != nil {
-				// log this
-				return
+			if out, err := ExecShell(); err != nil {
+				fmt.Println(string(out))
+				content = rollback
 			}
 
 			// reset buffer
@@ -208,17 +211,14 @@ func AppendToFile(text string) error {
 	return bufio.ErrFinalToken
 }
 
-func ExecShell() error {
+func ExecShell() ([]byte, error) {
 
 	// needs external package support
 	cmd := exec.Command("go", "run", SHELLPATH)
 
 	output, err := cmd.CombinedOutput()
 
-	fmt.Println(string(output))
-	fmt.Println(err)
-
-	return nil
+	return output, err
 
 }
 
