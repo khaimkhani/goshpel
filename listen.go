@@ -66,16 +66,16 @@ func ReadStdin() {
 				break
 			}
 
-			fmt.Println(content)
 			rollback = strings.Clone(content)
-			Inject(textbuf, stype, &content)
+			ready := Inject(textbuf, stype, &content)
 			AppendToFile(content)
 
-			// dont exec import statements
-			// wait till func def
-			if out, err := ExecShell(); err != nil {
+			if ready {
+				out, err := ExecShell()
 				fmt.Println(string(out))
-				content = rollback
+				if err != nil {
+					content = rollback
+				}
 			}
 
 			// reset buffer
@@ -109,6 +109,7 @@ func CheckMultiline(s *stack, line string) (bool, error) {
 
 func GetStatementType(txt []string, t *Tracker) (string, error) {
 
+	// TODO: empty strings should be ignored.
 	text := strings.Join(txt, " ")
 
 	stype := "MAIN"
@@ -133,12 +134,13 @@ func GetStatementType(txt []string, t *Tracker) (string, error) {
 	return stype, nil
 }
 
-func Inject(text []string, stype string, content *string) {
+func Inject(text []string, stype string, content *string) bool {
 
 	expr := strings.Join(text, " ")
 	var sb strings.Builder
 	var before, after, breaker string
 	var ok bool
+	ready := true
 
 	switch stype {
 	case "MAIN":
@@ -152,6 +154,7 @@ func Inject(text []string, stype string, content *string) {
 	case "IMPORT":
 		// before importbreak
 		breaker = IMPORTBREAK
+		ready = false
 
 	case "REPLACE":
 		// replace existing var
@@ -161,8 +164,7 @@ func Inject(text []string, stype string, content *string) {
 
 	if !ok {
 		// error
-		fmt.Println(ok)
-		return
+		return false
 	}
 
 	sb.WriteString(before)
@@ -172,6 +174,8 @@ func Inject(text []string, stype string, content *string) {
 	sb.WriteString(breaker)
 	sb.WriteString(after)
 	*content = sb.String()
+
+	return ready
 }
 
 func CopyFile(src string, dest string) error {
