@@ -27,3 +27,9 @@ func (t *Tracker) Exists(key string) bool {
 	_, ok := t.vars[key]
 	return ok
 }
+
+func (t *Tracker) Get(key string) (any, bool) {
+
+	val, ok := t.vars[key]
+	return val, ok
+}
