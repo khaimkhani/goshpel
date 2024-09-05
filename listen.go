@@ -73,6 +73,12 @@ func ReadStdin() {
 			if stype == "IMPORT" {
 				pkgs := GetPkgNames(textbuf)
 				fmt.Println(pkgs)
+			} else {
+				// remove this else block
+				// TEMP
+				fmt.Println("enters")
+				GetUsedPkgs(textbuf)
+				continue
 			}
 
 			// fmt.Println(content)
@@ -95,6 +101,18 @@ func ReadStdin() {
 	}
 }
 
+func GetUsedPkgs(text []string) []string {
+
+	fulltext := strings.Join(text, " ")
+
+	re := regexp.MustCompile(`/[^a-zA-Z\d](.*)\./`)
+	match := re.FindAllStringSubmatch(fulltext, -1)
+	fmt.Println(match)
+
+	// TEMP
+	return text
+}
+
 func GetPkgNames(text []string) []string {
 
 	fulltext := strings.Join(text, " ")
@@ -106,7 +124,12 @@ func GetPkgNames(text []string) []string {
 	pkgs := []string{}
 
 	for _, m := range match {
-		pkgs = append(pkgs, m[1])
+		pkg := m[1]
+		if strings.Contains(pkg, "/") {
+			splitstr := strings.Split(pkg, "/")
+			pkg = splitstr[len(splitstr)-1]
+		}
+		pkgs = append(pkgs, pkg)
 	}
 
 	return pkgs
