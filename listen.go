@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -30,7 +31,8 @@ const FUNCDEFBREAK string = "//FDB"
 func ReadStdin() {
 	// Read file to strings optionally
 	content := fmt.Sprintf("package main\n%s\n %s\n func main() {\n%s\n }", IMPORTBREAK, FUNCDEFBREAK, MAINBREAK)
-	t := NewTracker()
+
+	//var imports map[string]string
 	multiline := false
 	textbuf := []string{}
 	var err error
@@ -59,13 +61,21 @@ func ReadStdin() {
 		}
 
 		textbuf = append(textbuf, text)
+		textbuf = append(textbuf, "\n")
 		if !multiline {
 			// determine type (import, package, inside main())
-			stype, err := GetStatementType(textbuf, t)
+			stype, err := GetStatementType(textbuf)
 			if err != nil {
 				break
 			}
 
+			// if stype import, track it and only inject if a given expr has the import
+			if stype == "IMPORT" {
+				pkgs := GetPkgNames(textbuf)
+				fmt.Println(pkgs)
+			}
+
+			// fmt.Println(content)
 			rollback = strings.Clone(content)
 			ready := Inject(textbuf, stype, &content)
 			AppendToFile(content)
@@ -83,6 +93,23 @@ func ReadStdin() {
 
 		}
 	}
+}
+
+func GetPkgNames(text []string) []string {
+
+	fulltext := strings.Join(text, " ")
+
+	re := regexp.MustCompile(`"(.*)"`)
+	match := re.FindAllStringSubmatch(fulltext, -1)
+	fmt.Println(match)
+
+	pkgs := []string{}
+
+	for _, m := range match {
+		pkgs = append(pkgs, m[1])
+	}
+
+	return pkgs
 }
 
 func CheckMultiline(s *stack, line string) (bool, error) {
@@ -107,7 +134,7 @@ func CheckMultiline(s *stack, line string) (bool, error) {
 	return len(s.s) > 0, nil
 }
 
-func GetStatementType(txt []string, t *Tracker) (string, error) {
+func GetStatementType(txt []string) (string, error) {
 
 	// TODO: empty strings should be ignored.
 	text := strings.Join(txt, " ")
@@ -144,18 +171,12 @@ func Inject(text []string, stype string, content *string) bool {
 
 	switch stype {
 	case "MAIN":
-		// inject at bottom of main func
 		breaker = MAINBREAK
-
 	case "FUNC_DEF":
-		// before funcdefbreak
 		breaker = FUNCDEFBREAK
-
 	case "IMPORT":
-		// before importbreak
 		breaker = IMPORTBREAK
 		ready = false
-
 	case "REPLACE":
 		// replace existing var
 	}
@@ -163,7 +184,6 @@ func Inject(text []string, stype string, content *string) bool {
 	before, after, ok = strings.Cut(*content, breaker)
 
 	if !ok {
-		// error
 		return false
 	}
 
