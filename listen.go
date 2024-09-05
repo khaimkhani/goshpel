@@ -94,9 +94,8 @@ func ReadStdin() {
 				}
 			}
 
-			// reset buffer
+			// reset
 			textbuf = nil
-
 		}
 	}
 }
@@ -105,7 +104,7 @@ func GetUsedPkgs(text []string) []string {
 
 	fulltext := strings.Join(text, " ")
 
-	re := regexp.MustCompile(`/[^a-zA-Z\d](.*)\./`)
+	re := regexp.MustCompile(`^([^\s\d.]+)\./`)
 	match := re.FindAllStringSubmatch(fulltext, -1)
 	fmt.Println(match)
 
