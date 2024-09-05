@@ -12,8 +12,11 @@ import (
 
 // var SHELLPATH string = "/var/lib/goshpel/shell.go"
 
+// dont need this
+// load from old or empty
 var SHELLPATH string = "./dev/shell.go"
 
+// Be able to load "old" using a flag
 var RESTORE string = "./dev/shell-old.txt"
 
 const IMPORTBREAK string = "//IB"
@@ -25,6 +28,8 @@ const FUNCDEFBREAK string = "//FDB"
 // StdoutPipe errors should trigger a reroll (after piping error to terminal)
 
 func ReadStdin() {
+	// Read file to strings optionally
+	content := fmt.Sprintf("%s\n %s\n func main() {\n%s\n }", IMPORTBREAK, FUNCDEFBREAK, MAINBREAK)
 	t := NewTracker()
 	multiline := false
 	textbuf := []string{}
@@ -56,12 +61,12 @@ func ReadStdin() {
 		if !multiline {
 			// determine type (import, package, inside main())
 			stype, err := GetStatementType(textbuf, t)
-			fmt.Println(stype, err)
 			if err != nil {
 				break
 			}
+			fmt.Println(content)
 			// exec code
-			Inject(textbuf, stype)
+			Inject(textbuf, stype, &content)
 
 			// reset buffer
 			textbuf = nil
@@ -118,26 +123,45 @@ func GetStatementType(txt []string, t *Tracker) (string, error) {
 	return stype, nil
 }
 
-func Inject(text []string, stype string) {
+func Inject(text []string, stype string, content *string) {
 
 	expr := strings.Join(text, " ")
-
-	fmt.Println(expr)
+	var sb strings.Builder
+	var before, after, breaker string
+	var ok bool
 
 	switch stype {
 	case "MAIN":
 		// inject at bottom of main func
+		breaker = MAINBREAK
 
 	case "FUNC_DEF":
 		// before funcdefbreak
+		breaker = FUNCDEFBREAK
 
 	case "IMPORT":
 		// before importbreak
+		breaker = IMPORTBREAK
 
 	case "REPLACE":
 		// replace existing var
 	}
 
+	before, after, ok = strings.Cut(*content, breaker)
+
+	if !ok {
+		// error
+		fmt.Println(ok)
+		return
+	}
+
+	sb.WriteString(before)
+	sb.WriteString(expr)
+	sb.WriteString("\n")
+	sb.WriteString(" ")
+	sb.WriteString(breaker)
+	sb.WriteString(after)
+	*content = sb.String()
 }
 
 func CopyFile(src string, dest string) error {
