@@ -74,10 +74,12 @@ func ReadStdin() {
 				pkgs := GetPkgNames(textbuf)
 				fmt.Println(pkgs)
 			} else {
+				// TODO have to track types too and exclude those mfs
 				// remove this else block
-				// TEMP
-				fmt.Println("enters")
 				GetUsedPkgs(textbuf)
+
+				// TEMP
+				textbuf = nil
 				continue
 			}
 
@@ -104,8 +106,9 @@ func GetUsedPkgs(text []string) []string {
 
 	fulltext := strings.Join(text, " ")
 
-	re := regexp.MustCompile(`^([^\s\d.]+)\./`)
+	re := regexp.MustCompile(`\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\.`)
 	match := re.FindAllStringSubmatch(fulltext, -1)
+	fmt.Println("in match")
 	fmt.Println(match)
 
 	// TEMP
