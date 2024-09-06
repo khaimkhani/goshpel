@@ -32,7 +32,9 @@ func ReadStdin() {
 	// Read file to strings optionally
 	content := fmt.Sprintf("package main\n%s\n %s\n func main() {\n%s\n }", IMPORTBREAK, FUNCDEFBREAK, MAINBREAK)
 
-	//var imports map[string]string
+	staged := make(map[string]string)
+	// TEMP
+	fmt.Println(staged)
 	multiline := false
 	textbuf := []string{}
 	var err error
@@ -63,29 +65,39 @@ func ReadStdin() {
 		textbuf = append(textbuf, text)
 		textbuf = append(textbuf, "\n")
 		if !multiline {
+			fulltext := strings.Join(textbuf, " ")
+			rollback = strings.Clone(content)
+
 			// determine type (import, package, inside main())
-			stype, err := GetStatementType(textbuf)
+			stype, err := GetStatementType(fulltext)
 			if err != nil {
 				break
 			}
 
+			// FIX something is probs broken here if ur wondering where
+
 			// if stype import, track it and only inject if a given expr has the import
 			if stype == "IMPORT" {
-				pkgs := GetPkgNames(textbuf)
-				fmt.Println(pkgs)
-			} else {
-				// TODO have to track types too and exclude those mfs
-				// remove this else block
-				GetUsedPkgs(textbuf)
-
-				// TEMP
-				textbuf = nil
+				pkgs := GetPkgNames(fulltext)
+				for _, pkg := range pkgs {
+					staged[pkg] = fmt.Sprintf("import \"%s\"", pkg)
+				}
+				// read next
 				continue
+			} else {
+				// remove this else block
+				imprts := GetUsedPkgs(fulltext)
+				// inject necessary imports before expression calls
+				for _, imp := range imprts {
+					if val, ok := staged[imp]; ok {
+						Inject(val, "IMPORT", &content)
+					}
+				}
 			}
 
-			// fmt.Println(content)
-			rollback = strings.Clone(content)
-			ready := Inject(textbuf, stype, &content)
+			// this makes me sad
+			ready := Inject(fulltext, stype, &content)
+			fmt.Println(content)
 			AppendToFile(content)
 
 			if ready {
@@ -102,26 +114,31 @@ func ReadStdin() {
 	}
 }
 
-func GetUsedPkgs(text []string) []string {
-
-	fulltext := strings.Join(text, " ")
+// TODO its useless having these two funcs like this
+func GetUsedPkgs(text string) []string {
 
 	re := regexp.MustCompile(`\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\.`)
-	match := re.FindAllStringSubmatch(fulltext, -1)
-	fmt.Println("in match")
-	fmt.Println(match)
+	match := re.FindAllStringSubmatch(text, -1)
 
-	// TEMP
-	return text
+	pkgs := []string{}
+
+	for _, m := range match {
+		pkg := m[1]
+		if strings.Contains(pkg, "/") {
+			splitstr := strings.Split(pkg, "/")
+			pkg = splitstr[len(splitstr)-1]
+		}
+		pkgs = append(pkgs, pkg)
+	}
+
+	return pkgs
+
 }
 
-func GetPkgNames(text []string) []string {
-
-	fulltext := strings.Join(text, " ")
+func GetPkgNames(text string) []string {
 
 	re := regexp.MustCompile(`"(.*)"`)
-	match := re.FindAllStringSubmatch(fulltext, -1)
-	fmt.Println(match)
+	match := re.FindAllStringSubmatch(text, -1)
 
 	pkgs := []string{}
 
@@ -159,10 +176,9 @@ func CheckMultiline(s *stack, line string) (bool, error) {
 	return len(s.s) > 0, nil
 }
 
-func GetStatementType(txt []string) (string, error) {
+func GetStatementType(text string) (string, error) {
 
 	// TODO: empty strings should be ignored.
-	text := strings.Join(txt, " ")
 
 	stype := "MAIN"
 
@@ -186,9 +202,8 @@ func GetStatementType(txt []string) (string, error) {
 	return stype, nil
 }
 
-func Inject(text []string, stype string, content *string) bool {
+func Inject(expr string, stype string, content *string) bool {
 
-	expr := strings.Join(text, " ")
 	var sb strings.Builder
 	var before, after, breaker string
 	var ok bool
