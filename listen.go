@@ -2,12 +2,9 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 )
 
@@ -22,19 +19,23 @@ var RESTORE string = "./dev/shell-old.txt"
 
 const IMPORTBREAK string = "//IB"
 const MAINBREAK string = "//MB"
+const UNUSEDBREAKS string = "//UB"
 const FUNCDEFBREAK string = "//FDB"
 
 // TODO:
 // Clean up/refactor
 // StdoutPipe errors should trigger a reroll (after piping error to terminal)
 
+type ImportState struct {
+	exec     string
+	injected bool
+}
+
 func ReadStdin() {
 	// Read file to strings optionally
-	content := fmt.Sprintf("package main\n%s\n %s\n func main() {\n%s\n }", IMPORTBREAK, FUNCDEFBREAK, MAINBREAK)
+	content := fmt.Sprintf("package main\n%s\n %s\n func main() {\n%s\n%s\n } \n func UNUSED(x ...any) {\n}", IMPORTBREAK, FUNCDEFBREAK, MAINBREAK, UNUSEDBREAKS)
 
-	staged := make(map[string]string)
-	// TEMP
-	fmt.Println(staged)
+	staged := make(map[string]*ImportState)
 	multiline := false
 	textbuf := []string{}
 	var err error
@@ -68,8 +69,6 @@ func ReadStdin() {
 		if !multiline {
 			fulltext := strings.Join(textbuf, " ")
 			rollback = strings.Clone(content)
-			fmt.Println(content)
-			fmt.Println(staged)
 
 			// determine type (import, package, inside main())
 			stype, err := GetStatementType(fulltext)
@@ -77,157 +76,71 @@ func ReadStdin() {
 				break
 			}
 
-			fmt.Println(stype)
-
 			// if stype import, track it and only inject if a given expr has the import
 			if stype == "IMPORT" {
 				pkgs := GetPkgNames(fulltext)
 				for _, pkg := range pkgs {
-					staged[pkg] = fmt.Sprintf("import \"%s\"", pkg)
+					if _, ok := staged[pkg]; !ok {
+						staged[pkg] = &ImportState{fmt.Sprintf("import \"%s\"", pkg), false}
+					}
 				}
 				// read next
 				continue
 			} else {
 				imprts := GetUsedPkgs(fulltext)
-				// inject necessary imports before expression calls
 				for _, imp := range imprts {
-					if val, ok := staged[imp]; ok {
-						Inject(val, "IMPORT", &content)
+					if val, ok := staged[imp]; ok && !val.injected {
+						Inject(val.exec, "IMPORT", &content)
+						val.injected = true
 					}
 				}
-				fmt.Println("extis for loop")
-			}
-
-			// this makes me sad
-			ready := Inject(fulltext, stype, &content)
-			fmt.Println(content)
-			AppendToFile(content)
-
-			if ready {
-				out, err := ExecShell()
-				fmt.Println(string(out))
-				if err != nil {
-					content = rollback
+				if stype == "MAIN" {
+					// check if var dec then add unused at nearest scope
+					// for now just do single line declarations
+					decs := GetDeclarations(fulltext)
+					for _, dec := range decs {
+						// ideally prolly should have a queue with ops and routine execing those ops
+						decl := fmt.Sprintf("UNUSED(%s)", dec)
+						Inject(decl, "UNUSED", &content)
+					}
 				}
 			}
 
-		}
-	}
-}
+			// TODO for single var expr wrap in fmt.Println and write unwrapped to file
 
-// TODO its useless having these two funcs like this
-func GetUsedPkgs(text string) []string {
+			Inject(fulltext, stype, &content)
+			AppendToFile(content)
 
-	re := regexp.MustCompile(`\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\.`)
-	match := re.FindAllStringSubmatch(text, -1)
-
-	pkgs := []string{}
-
-	for _, m := range match {
-		pkg := m[1]
-		if strings.Contains(pkg, "/") {
-			splitstr := strings.Split(pkg, "/")
-			pkg = splitstr[len(splitstr)-1]
-		}
-		pkgs = append(pkgs, pkg)
-	}
-
-	return pkgs
-
-}
-
-func GetPkgNames(text string) []string {
-
-	re := regexp.MustCompile(`"(.*)"`)
-	match := re.FindAllStringSubmatch(text, -1)
-
-	pkgs := []string{}
-
-	for _, m := range match {
-		pkg := m[1]
-		if strings.Contains(pkg, "/") {
-			splitstr := strings.Split(pkg, "/")
-			pkg = splitstr[len(splitstr)-1]
-		}
-		pkgs = append(pkgs, pkg)
-	}
-
-	fmt.Println(pkgs)
-	return pkgs
-}
-
-func CheckMultiline(s *stack, line string) (bool, error) {
-
-	for _, i := range line {
-		switch i {
-		case '{':
-			s.Push('}')
-		case '(':
-			s.Push(')')
-		case ')', '}':
-			char, err := s.Pop()
+			out, err := ExecShell()
+			fmt.Println(string(out))
 			if err != nil {
-				return false, err
+				content = rollback
 			}
-			if char, ok := char.(rune); ok && char != i {
-				return false, errors.New("Paranthesis not closed")
-			}
+			// remove all fmt Stdout from main
+
 		}
 	}
-
-	return len(s.s) > 0, nil
 }
 
-func GetStatementType(text string) (string, error) {
-
-	// TODO: empty strings should be ignored.
-
-	stype := "MAIN"
-
-	if imprt := strings.HasPrefix(text, "import "); imprt {
-		stype = "IMPORT"
-	} else if funcdef := strings.HasPrefix(text, "func "); funcdef {
-		stype = "FUNC_DEF"
-	} else if constdef := strings.HasPrefix(text, "const "); constdef {
-		stype = "FUNC_DEF"
-	} else if vardef := strings.HasPrefix(text, "var "); vardef {
-		stype = "FUNC_DEF"
-	}
-
-	if stype == "MAIN" {
-		// check if var declaration/reassignment
-		// check if tracker has var
-		// do appropriate things
-		// regex match for "=" and ":="
-	}
-
-	return stype, nil
-}
-
-func Inject(expr string, stype string, content *string) bool {
+func Inject(expr string, stype string, content *string) {
 
 	var sb strings.Builder
 	var before, after, breaker string
-	var ok bool
-	ready := true
 
 	switch stype {
 	case "MAIN":
 		breaker = MAINBREAK
 	case "FUNC_DEF":
+		// should include var/const decs here
 		breaker = FUNCDEFBREAK
 	case "IMPORT":
 		breaker = IMPORTBREAK
 		// ready = false
-	case "REPLACE":
-		// replace existing var
+	case "UNUSED":
+		breaker = UNUSEDBREAKS
 	}
 
-	before, after, ok = strings.Cut(*content, breaker)
-
-	if !ok {
-		return false
-	}
+	before, after, _ = strings.Cut(*content, breaker)
 
 	sb.WriteString(before)
 	sb.WriteString(expr)
@@ -237,44 +150,6 @@ func Inject(expr string, stype string, content *string) bool {
 	sb.WriteString(after)
 	*content = sb.String()
 
-	return ready
-}
-
-func CopyFile(src string, dest string) error {
-	srcf, err := os.OpenFile(src, os.O_CREATE|os.O_RDONLY, 0644)
-	defer srcf.Close()
-
-	if err != nil {
-		return err
-	}
-
-	destf, err := os.OpenFile(dest, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0755)
-	defer destf.Close()
-
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(destf, srcf)
-
-	return err
-}
-
-func AppendToFile(text string) error {
-
-	fi, err := os.OpenFile(SHELLPATH, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0755)
-	if err != nil {
-		return err
-	}
-
-	defer fi.Close()
-
-	// Need checks here for what goes inside main {} and what is outside
-	if _, err := fi.WriteString(text); err != nil {
-		panic(err)
-	}
-
-	// is valid expression + shell returned error
-	return bufio.ErrFinalToken
 }
 
 func ExecShell() ([]byte, error) {
