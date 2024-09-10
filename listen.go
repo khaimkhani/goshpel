@@ -46,6 +46,7 @@ func ReadStdin() {
 		if multiline {
 			fmt.Print("... ")
 		} else {
+			textbuf = nil
 			fmt.Print(">> ")
 		}
 		scanner.Scan()
@@ -67,6 +68,8 @@ func ReadStdin() {
 		if !multiline {
 			fulltext := strings.Join(textbuf, " ")
 			rollback = strings.Clone(content)
+			fmt.Println(content)
+			fmt.Println(staged)
 
 			// determine type (import, package, inside main())
 			stype, err := GetStatementType(fulltext)
@@ -74,7 +77,7 @@ func ReadStdin() {
 				break
 			}
 
-			// FIX something is probs broken here if ur wondering where
+			fmt.Println(stype)
 
 			// if stype import, track it and only inject if a given expr has the import
 			if stype == "IMPORT" {
@@ -85,7 +88,6 @@ func ReadStdin() {
 				// read next
 				continue
 			} else {
-				// remove this else block
 				imprts := GetUsedPkgs(fulltext)
 				// inject necessary imports before expression calls
 				for _, imp := range imprts {
@@ -93,6 +95,7 @@ func ReadStdin() {
 						Inject(val, "IMPORT", &content)
 					}
 				}
+				fmt.Println("extis for loop")
 			}
 
 			// this makes me sad
@@ -108,8 +111,6 @@ func ReadStdin() {
 				}
 			}
 
-			// reset
-			textbuf = nil
 		}
 	}
 }
@@ -151,6 +152,7 @@ func GetPkgNames(text string) []string {
 		pkgs = append(pkgs, pkg)
 	}
 
+	fmt.Println(pkgs)
 	return pkgs
 }
 
@@ -216,7 +218,7 @@ func Inject(expr string, stype string, content *string) bool {
 		breaker = FUNCDEFBREAK
 	case "IMPORT":
 		breaker = IMPORTBREAK
-		ready = false
+		// ready = false
 	case "REPLACE":
 		// replace existing var
 	}
