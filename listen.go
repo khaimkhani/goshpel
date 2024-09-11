@@ -95,7 +95,6 @@ func ReadStdin() {
 					}
 				}
 				if stype == "MAIN" {
-					// check if var dec then add unused at nearest scope
 					// for now just do single line declarations
 					decs := GetDeclarations(fulltext)
 					for _, dec := range decs {
@@ -131,11 +130,10 @@ func Inject(expr string, stype string, content *string) {
 	case "MAIN":
 		breaker = MAINBREAK
 	case "FUNC_DEF":
-		// should include var/const decs here
+		// include var/const decs here?
 		breaker = FUNCDEFBREAK
 	case "IMPORT":
 		breaker = IMPORTBREAK
-		// ready = false
 	case "UNUSED":
 		breaker = UNUSEDBREAKS
 	}
@@ -158,14 +156,10 @@ func ExecShell() ([]byte, error) {
 	cmd := exec.Command("go", "run", SHELLPATH)
 
 	output, err := cmd.CombinedOutput()
-
 	return output, err
 
 }
 
 func main() {
-	// TODO run init
-	// TEMP
-	// ExecShell()
 	ReadStdin()
 }
