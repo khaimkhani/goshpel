@@ -21,6 +21,7 @@ type ASTNode struct {
 	children []*ASTNode
 	op       string
 	injected bool
-	ntype    string
-	name     string
+	// node type
+	ntype string
+	name  string
 }
