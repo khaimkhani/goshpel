@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"sync"
 )
 
@@ -8,12 +9,6 @@ import (
 type stack struct {
 	lock sync.Mutex
 	s    []any
-}
-
-type EmptyStack struct{}
-
-func (e *EmptyStack) Error() string {
-	return "Empty Stack"
 }
 
 func NewStack() *stack {
@@ -33,7 +28,7 @@ func (s *stack) Pop() (any, error) {
 
 	l := len(s.s)
 	if l == 0 {
-		return 0, &EmptyStack{}
+		return 0, errors.New("Stack Empty")
 	}
 
 	res := s.s[l-1]
