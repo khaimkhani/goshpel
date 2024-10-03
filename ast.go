@@ -32,57 +32,52 @@ const (
 	FUNCCALL = "FUNCCALL"
 )
 
+type ASTRoot struct {
+	imports []*ASTNode
+	main    []*ASTNode
+	decls   []*ASTNode
+}
+
 type ASTNode struct {
-	// this should be repr i think
 	children []*ASTNode
 	// node type
-	ntype string
-	val   string
+	ntype      string
+	startToken string
+	endToken   string
+	val        string
+	// When a package becomes unused/used
+	inject bool
 }
 
-func NewRootAst() *ASTNode {
-	return NewAst(ROOT, ROOT)
+func NewRootAst() *ASTRoot {
+	return &ASTRoot{}
 }
 
-func NewAst(ntype string, name string) *ASTNode {
-	return &ASTNode{make([]*ASTNode, 0), ntype, name}
+func (r *ASTRoot) AddImports(imports string) *ASTRoot {
+	r.imports = append(r.imports, CreateTree(imports)...)
+	return r
 }
 
-func (n *ASTNode) AddChildren(children []*ASTNode) *ASTNode {
-	n.children = append(n.children, children...)
-	return n
+func (r *ASTRoot) AddDecls(decls string) *ASTRoot {
+	r.decls = append(r.decls, CreateTree(decls)...)
+	return r
 }
 
-func (n *ASTNode) AddFuncDefNode(funcDef []string) *ASTNode {
-	// New func def
-	// Inject staged imports
-	// break down expr
-	return n
+func (r *ASTRoot) AddMain(main string) *ASTRoot {
+	r.main = append(r.main, CreateTree(main)...)
+	return r
 }
 
-func (n *ASTNode) AddImportNode(imports []string) *ASTNode {
-	// Inject import
-	// Only if there is a var decl for that node
-	return n
+func (r *ASTRoot) CreateSrc() {
+	// return src code from ast repr
+	return
 }
 
-func (n *ASTNode) AddExprNode(expr []string) *ASTNode {
-	// this operates a bit different to the two above.
-	// called from it's immediate parent and returns itself.
+func CreateTree(src string) []*ASTNode {
+	nodes := make([]*ASTNode, 0)
+	// construct tree from source and return current root
+	n := &ASTNode{}
+	nodes = append(nodes, n)
+	return nodes
 
-	// op should be the vals in the expr
-	node := NewAst("", EXPR, EXPR)
-
-	return node
-}
-
-func (n *ASTNode) AddShvarDecNode(shvarDec []string) *ASTNode {
-
-	node := NewAst("", SHVARDEC, SHVARDEC)
-	return node
-}
-
-func GetStatementTypes(text string) ([]string, error) {
-
-	return make([]string, 0), nil
 }
